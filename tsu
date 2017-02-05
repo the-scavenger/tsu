@@ -13,11 +13,13 @@ show_usage() {
   echo '    Prepend /system/bin and /system/xbin to PATH.'
   echo '-e'
   echo '    Setup up some enviroment variables as when in Termux.'
+  echo '-z '
+  echo '    pass command'
 }
 	
 # parse the options
 # TODO: validate command line arguments
-while getopts ':ehps:' opt ; do
+while getopts ':ehps:z:' opt ; do
 case $opt in
   e)
       SETUP_ENV=1
@@ -26,12 +28,16 @@ case $opt in
   s)
       USER_SHELL=$OPTARG
       ;;
+  p)
+      PREPEND_SYSTEM_PATH=1
+      ;;
+  z)  
+	extra="-c \"$OPTARG\""  
+      ;;   
+
   h) 
       show_usage
       exit
-      ;;
-  p)
-      PREPEND_SYSTEM_PATH=1
       ;;
 esac
 done;
@@ -41,17 +47,17 @@ test -z "$PREFIX" && PREFIX=/data/data/com.termux/files/usr
 
 # prepend path
 if test -n "$PREPEND_SYSTEM_PATH"; then
-  PATH="/system/bin:/system/xbin:$PATH"
+  ROOT_PATH="/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin"
 fi
 
 # export environment variables.
 if test -n "$SETUP_ENV"; then
   export HOME=/data/data/com.termux/files/home
-  TERMUX_PATHS=data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin/applets
+  TERMUX_PATHS=/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin/applets
   if test -n "$PREPEND_SYSTEM_PATH"; then
-    PATH="$PATH:$TERMUX_PATHS"
+    PATH="$TERMUX_PATHS:$ROOT_PATH"
   else 
-    PATH="$TERMUX_PATHS:$PATH"
+    PATH="$TERMUX_PATHS:$ROOT_PATH"
   fi;
 export PATH;
 fi;
@@ -75,8 +81,8 @@ else
 fi
 
 # using the -c option of su allows to pass enviroment variables
-for s in '/system/xbin/su' '/su/bin/su'; do
+for s in '/system/xbin/su' '/su/bin/su' '/sbin/su' ; do
   if [ -e "$s" ]; then
-    exec "$s" --preserve-environment -c "LD_LIBRARY_PATH=$PREFIX/lib $ROOT_SHELL"
+    exec "$s" --preserve-environment -l -c "PREFIX=$PREFIX USER=root LD_LIBRARY_PATH=$PREFIX/lib PATH=$PATH HOME=$HOME PWD=$PWD TERM=$TERM $ROOT_SHELL -l $extra"
   fi;
-done;
+done
